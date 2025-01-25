@@ -107,6 +107,8 @@ class SmartIRMediaPlayer(MediaPlayerEntity, RestoreEntity):
         self._support_flags = 0
 
         self._device_class = config.get(CONF_DEVICE_CLASS)
+        
+        self._channels = device_data['channels']
 
         #Supported features
         if 'off' in self._commands and self._commands['off'] is not None:
@@ -276,21 +278,30 @@ class SmartIRMediaPlayer(MediaPlayerEntity, RestoreEntity):
         if media_type != MediaType.CHANNEL:
             _LOGGER.error("invalid media type")
             return
+
+        if not media_id.isdigit():
+            media_id = str(media_id).replace(" ", "").lower()
+            
+            media_id = f"{self._channels[media_id]}"
+        
         if not media_id.isdigit():
             _LOGGER.error("media_id must be a channel number")
             return
 
         self._source = "Channel {}".format(media_id)
         for digit in media_id:
-            await self.send_command(self._commands['sources']["Channel {}".format(digit)])
+            await self.send_command(self._commands['sources']["Channel {}".format(digit)], wait=0.5)
         self.async_write_ha_state()
 
-    async def send_command(self, command):
+    async def send_command(self, command, wait=None):
         async with self._temp_lock:
             try:
                 await self._controller.send(command)
             except Exception as e:
                 _LOGGER.exception(e)
+
+        if wait is not None:
+            await asyncio.sleep(wait)
             
     async def async_update(self):
         if self._power_sensor is None:
